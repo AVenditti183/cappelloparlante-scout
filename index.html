@@ -56,12 +56,29 @@
           </p>
 
           <div class="field">
-            <label for="azure-bg-url">Audio di sottofondo (opzionale)</label>
+            <label for="azure-bg-select">Audio di sottofondo (opzionale)</label>
+            <select id="azure-bg-select">
+              <option value="">Nessuno</option>
+              <option value="Audio1.mp3">Audio1</option>
+              <option value="Audio2.mp3">Audio2</option>
+              <option value="custom">URL personalizzato...</option>
+            </select>
+          </div>
+          <div id="azure-bg-url-field" class="field" hidden>
+            <label for="azure-bg-url">URL audio personalizzato</label>
             <input type="url" id="azure-bg-url" placeholder="https://.../musica.mp3" autocomplete="off" />
           </div>
           <div class="field">
             <label for="azure-bg-volume">Volume sottofondo <span id="bg-volume-value" class="value-pill">0.5</span></label>
             <input type="range" id="azure-bg-volume" min="0" max="1" step="0.05" value="0.5" />
+          </div>
+          <div class="field">
+            <label for="azure-bg-fadein">Dissolvenza iniziale <span id="bg-fadein-value" class="value-pill">1.0s</span></label>
+            <input type="range" id="azure-bg-fadein" min="0" max="5" step="0.5" value="1" />
+          </div>
+          <div class="field">
+            <label for="azure-bg-fadeout">Dissolvenza finale <span id="bg-fadeout-value" class="value-pill">1.0s</span></label>
+            <input type="range" id="azure-bg-fadeout" min="0" max="5" step="0.5" value="1" />
           </div>
           <p class="azure-hint">
             Deve essere un URL pubblico (http/https) di un file audio: è il server Azure a scaricarlo, non il

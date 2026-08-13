@@ -12,9 +12,15 @@ const azureRegionSelect = document.querySelector<HTMLSelectElement>('#azure-regi
 const azureKeyInput = document.querySelector<HTMLInputElement>('#azure-key')!;
 const styleField = document.querySelector<HTMLDivElement>('#style-field')!;
 const styleSelect = document.querySelector<HTMLSelectElement>('#style-select')!;
+const bgSelect = document.querySelector<HTMLSelectElement>('#azure-bg-select')!;
+const bgUrlField = document.querySelector<HTMLDivElement>('#azure-bg-url-field')!;
 const bgUrlInput = document.querySelector<HTMLInputElement>('#azure-bg-url')!;
 const bgVolumeInput = document.querySelector<HTMLInputElement>('#azure-bg-volume')!;
 const bgVolumeValue = document.querySelector<HTMLSpanElement>('#bg-volume-value')!;
+const bgFadeInInput = document.querySelector<HTMLInputElement>('#azure-bg-fadein')!;
+const bgFadeInValue = document.querySelector<HTMLSpanElement>('#bg-fadein-value')!;
+const bgFadeOutInput = document.querySelector<HTMLInputElement>('#azure-bg-fadeout')!;
+const bgFadeOutValue = document.querySelector<HTMLSpanElement>('#bg-fadeout-value')!;
 const rateInput = document.querySelector<HTMLInputElement>('#rate-input')!;
 const pitchInput = document.querySelector<HTMLInputElement>('#pitch-input')!;
 const rateValue = document.querySelector<HTMLSpanElement>('#rate-value')!;
@@ -33,8 +39,11 @@ interface Settings {
   azureRegion: string;
   azureKey: string;
   azureStyle: string;
+  azureBgSelection: string;
   azureBgUrl: string;
   azureBgVolume: number;
+  azureBgFadeIn: number;
+  azureBgFadeOut: number;
   engine: Engine;
   rate: number;
   pitch: number;
@@ -50,8 +59,11 @@ const defaultSettings: Settings = {
   azureRegion: 'italynorth',
   azureKey: '',
   azureStyle: '',
+  azureBgSelection: '',
   azureBgUrl: '',
   azureBgVolume: 0.5,
+  azureBgFadeIn: 1,
+  azureBgFadeOut: 1,
   engine: 'browser',
   rate: 0.95,
   pitch: 1,
@@ -87,9 +99,15 @@ rateValue.textContent = `${settings.rate.toFixed(2)}×`;
 pitchValue.textContent = settings.pitch.toFixed(1);
 azureRegionSelect.value = settings.azureRegion;
 azureKeyInput.value = settings.azureKey;
+bgSelect.value = settings.azureBgSelection;
+bgUrlField.hidden = settings.azureBgSelection !== 'custom';
 bgUrlInput.value = settings.azureBgUrl;
 bgVolumeInput.value = String(settings.azureBgVolume);
 bgVolumeValue.textContent = settings.azureBgVolume.toFixed(2);
+bgFadeInInput.value = String(settings.azureBgFadeIn);
+bgFadeInValue.textContent = `${settings.azureBgFadeIn.toFixed(1)}s`;
+bgFadeOutInput.value = String(settings.azureBgFadeOut);
+bgFadeOutValue.textContent = `${settings.azureBgFadeOut.toFixed(1)}s`;
 setAccentButtons(settings.accent);
 setEngineButtons(settings.engine);
 azurePanel.hidden = settings.engine !== 'azure';
@@ -373,6 +391,12 @@ azureKeyInput.addEventListener('input', () => {
   saveSettings({ azureKey: azureKeyInput.value });
 });
 
+bgSelect.addEventListener('change', () => {
+  settings.azureBgSelection = bgSelect.value;
+  saveSettings({ azureBgSelection: bgSelect.value });
+  bgUrlField.hidden = bgSelect.value !== 'custom';
+});
+
 bgUrlInput.addEventListener('input', () => {
   settings.azureBgUrl = bgUrlInput.value;
   saveSettings({ azureBgUrl: bgUrlInput.value });
@@ -383,6 +407,20 @@ bgVolumeInput.addEventListener('input', () => {
   bgVolumeValue.textContent = volume.toFixed(2);
   settings.azureBgVolume = volume;
   saveSettings({ azureBgVolume: volume });
+});
+
+bgFadeInInput.addEventListener('input', () => {
+  const seconds = parseFloat(bgFadeInInput.value);
+  bgFadeInValue.textContent = `${seconds.toFixed(1)}s`;
+  settings.azureBgFadeIn = seconds;
+  saveSettings({ azureBgFadeIn: seconds });
+});
+
+bgFadeOutInput.addEventListener('input', () => {
+  const seconds = parseFloat(bgFadeOutInput.value);
+  bgFadeOutValue.textContent = `${seconds.toFixed(1)}s`;
+  settings.azureBgFadeOut = seconds;
+  saveSettings({ azureBgFadeOut: seconds });
 });
 
 voiceSelect.addEventListener('change', () => {
@@ -550,6 +588,12 @@ function speakWithBrowser(chunks: string[]) {
   setSpeakingState(true);
 }
 
+function resolveBackgroundAudioUrl(): string {
+  if (bgSelect.value === 'custom') return bgUrlInput.value.trim();
+  if (!bgSelect.value) return '';
+  return new URL(`${import.meta.env.BASE_URL}audio/${bgSelect.value}`, window.location.origin).href;
+}
+
 function speakWithAzure(chunks: string[]) {
   const key = azureKeyInput.value.trim();
   const region = azureRegionSelect.value;
@@ -564,7 +608,7 @@ function speakWithAzure(chunks: string[]) {
     return;
   }
 
-  const bgUrl = bgUrlInput.value.trim();
+  const bgUrl = resolveBackgroundAudioUrl();
   // Con audio di sottofondo l'intero testo va in un'unica richiesta: il tag
   // mstts:backgroundaudio riparte da capo a ogni <speak>, quindi spezzettare
   // per frase farebbe ripartire la traccia a ogni frase.
@@ -584,7 +628,14 @@ function speakWithAzure(chunks: string[]) {
       rate: parseFloat(rateInput.value),
       pitch: parseFloat(pitchInput.value),
       style: styleSelect.value,
-      background: bgUrl ? { url: bgUrl, volume: parseFloat(bgVolumeInput.value) } : undefined,
+      background: bgUrl
+        ? {
+            url: bgUrl,
+            volume: parseFloat(bgVolumeInput.value),
+            fadeInMs: Math.round(parseFloat(bgFadeInInput.value) * 1000),
+            fadeOutMs: Math.round(parseFloat(bgFadeOutInput.value) * 1000),
+          }
+        : undefined,
     },
     {
       onChunkStart: (index) => setStatus(total > 1 ? `Frase ${index + 1} di ${total}...` : 'In riproduzione...'),

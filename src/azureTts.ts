@@ -92,6 +92,8 @@ function pitchToPercent(pitch: number): string {
 export interface BackgroundAudio {
   url: string;
   volume: number;
+  fadeInMs: number;
+  fadeOutMs: number;
 }
 
 function buildSsml(
@@ -105,7 +107,7 @@ function buildSsml(
   const prosody = `<prosody rate="${rate}" pitch="${pitchToPercent(pitch)}">${escapeSsml(text)}</prosody>`;
   const body = style && voice.styles.includes(style) ? `<mstts:express-as style="${style}">${prosody}</mstts:express-as>` : prosody;
   const backgroundTag = background
-    ? `<mstts:backgroundaudio src="${escapeSsml(background.url)}" volume="${background.volume}" fadein="3000" fadeout="3000"/>`
+    ? `<mstts:backgroundaudio src="${escapeSsml(background.url)}" volume="${background.volume}" fadein="${background.fadeInMs}" fadeout="${background.fadeOutMs}"/>`
     : '';
   return (
     `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="${voice.lang}">` +
