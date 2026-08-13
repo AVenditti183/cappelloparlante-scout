@@ -35,13 +35,19 @@ export function styleLabel(style: string): string {
 // (l'elenco completo si potrebbe ottenere via synthesizer.getVoicesAsync(),
 // ma un set curato evita una chiamata di rete extra prima di poter parlare)
 export const AZURE_VOICES: AzureVoiceOption[] = [
+  // Voci "Multilingual", generazione piu' recente: nessuno stile SSML ma
+  // naturalezza di base superiore alle Neural standard sottostanti.
+  { shortName: 'it-IT-AlessioMultilingualNeural', label: 'Alessio (naturale)', lang: 'it-IT', gender: 'M', styles: [] },
+  { shortName: 'it-IT-GiuseppeMultilingualNeural', label: 'Giuseppe (naturale)', lang: 'it-IT', gender: 'M', styles: [] },
+  { shortName: 'it-IT-MarcelloMultilingualNeural', label: 'Marcello (naturale)', lang: 'it-IT', gender: 'M', styles: [] },
+  { shortName: 'it-IT-IsabellaMultilingualNeural', label: 'Isabella (naturale)', lang: 'it-IT', gender: 'F', styles: [] },
   { shortName: 'it-IT-DiegoNeural', label: 'Diego', lang: 'it-IT', gender: 'M', styles: ['cheerful', 'excited', 'sad'] },
   { shortName: 'it-IT-GianniNeural', label: 'Gianni', lang: 'it-IT', gender: 'M', styles: [] },
   { shortName: 'it-IT-RinaldoNeural', label: 'Rinaldo', lang: 'it-IT', gender: 'M', styles: [] },
   { shortName: 'it-IT-ElsaNeural', label: 'Elsa', lang: 'it-IT', gender: 'F', styles: [] },
   {
     shortName: 'it-IT-IsabellaNeural',
-    label: 'Isabella',
+    label: 'Isabella (espressiva)',
     lang: 'it-IT',
     gender: 'F',
     styles: ['chat', 'cheerful', 'excited', 'sad', 'whispering'],
@@ -101,9 +107,9 @@ export interface AzureSpeakCallbacks {
 
 export class AzureSpeechSession {
   private synthesizer: sdk.SpeechSynthesizer | null = null;
-  private player: sdk.SpeakerAudioDestination | null = null;
+  private audioEl: HTMLAudioElement | null = null;
+  private currentObjectUrl: string | null = null;
   private cancelled = false;
-  private paused = false;
 
   async speak(
     chunks: string[],
@@ -113,13 +119,16 @@ export class AzureSpeechSession {
     try {
       const speechConfig = sdk.SpeechConfig.fromSubscription(config.key, config.region);
       speechConfig.speechSynthesisVoiceName = config.voice.shortName;
-      // Mp3 ha il supporto di playback via Media Source Extensions piu' affidabile
-      // su Chrome/Safari mobile rispetto ai formati PCM/Opus di default dell'SDK.
+      // Mp3 semplice, decodificato da un elemento <audio> standard: a differenza
+      // del playback via Media Source Extensions (SpeakerAudioDestination), questo
+      // funziona anche su iOS Safari/WebKit (e quindi su Chrome/Firefox per iOS,
+      // che sotto sono comunque WebKit).
       speechConfig.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Audio24Khz96KBitRateMonoMp3;
 
-      this.player = new sdk.SpeakerAudioDestination();
-      const audioConfig = sdk.AudioConfig.fromSpeakerOutput(this.player);
-      this.synthesizer = new sdk.SpeechSynthesizer(speechConfig, audioConfig);
+      // audioConfig=null evita che l'SDK provi comunque un output automatico via
+      // MSE: vogliamo solo il buffer audio, la riproduzione la gestiamo noi.
+      this.synthesizer = new sdk.SpeechSynthesizer(speechConfig, null);
+      this.audioEl = new Audio();
     } catch (error) {
       callbacks.onError(error instanceof Error ? error.message : 'Impossibile inizializzare Azure Speech.');
       this.close();
@@ -131,7 +140,9 @@ export class AzureSpeechSession {
       callbacks.onChunkStart(index, chunks.length);
       const ssml = buildSsml(chunks[index], config.voice, config.rate, config.pitch, config.style);
       try {
-        await this.speakChunk(ssml);
+        const audioData = await this.synthesizeChunk(ssml);
+        if (this.cancelled) return;
+        await this.playAudioData(audioData);
       } catch (error) {
         if (!this.cancelled) {
           callbacks.onError(error instanceof Error ? error.message : 'Errore di sintesi Azure.');
@@ -145,7 +156,7 @@ export class AzureSpeechSession {
     this.close();
   }
 
-  private speakChunk(ssml: string): Promise<void> {
+  private synthesizeChunk(ssml: string): Promise<ArrayBuffer> {
     return new Promise((resolve, reject) => {
       if (!this.synthesizer) {
         reject(new Error('Sintetizzatore non inizializzato.'));
@@ -159,7 +170,7 @@ export class AzureSpeechSession {
         (result) => {
           clearTimeout(timeout);
           if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
-            resolve();
+            resolve(result.audioData);
           } else {
             reject(new Error(result.errorDetails || 'Sintesi Azure non riuscita. Controlla chiave e regione.'));
           }
@@ -172,18 +183,38 @@ export class AzureSpeechSession {
     });
   }
 
+  private playAudioData(audioData: ArrayBuffer): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.audioEl) {
+        reject(new Error('Elemento audio non disponibile.'));
+        return;
+      }
+      if (this.currentObjectUrl) URL.revokeObjectURL(this.currentObjectUrl);
+      this.currentObjectUrl = URL.createObjectURL(new Blob([audioData], { type: 'audio/mpeg' }));
+
+      const audioEl = this.audioEl;
+      audioEl.onended = () => resolve();
+      audioEl.onerror = () => reject(new Error('Il browser non riesce a riprodurre l\'audio ricevuto da Azure.'));
+      audioEl.src = this.currentObjectUrl;
+
+      audioEl.play().catch((error) => {
+        reject(
+          new Error(
+            error?.name === 'NotAllowedError'
+              ? 'Il browser ha bloccato la riproduzione automatica. Tocca di nuovo "Ascolta".'
+              : `Riproduzione audio non riuscita: ${error?.message ?? error}`,
+          ),
+        );
+      });
+    });
+  }
+
   pause() {
-    if (this.player && !this.paused) {
-      this.player.pause();
-      this.paused = true;
-    }
+    this.audioEl?.pause();
   }
 
   resume() {
-    if (this.player && this.paused) {
-      this.player.resume();
-      this.paused = false;
-    }
+    void this.audioEl?.play();
   }
 
   stop() {
@@ -192,9 +223,18 @@ export class AzureSpeechSession {
   }
 
   private close() {
-    this.player?.close();
+    if (this.audioEl) {
+      this.audioEl.onended = null;
+      this.audioEl.onerror = null;
+      this.audioEl.pause();
+      this.audioEl.removeAttribute('src');
+    }
+    if (this.currentObjectUrl) {
+      URL.revokeObjectURL(this.currentObjectUrl);
+      this.currentObjectUrl = null;
+    }
     this.synthesizer?.close();
-    this.player = null;
     this.synthesizer = null;
+    this.audioEl = null;
   }
 }
