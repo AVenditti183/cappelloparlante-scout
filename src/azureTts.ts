@@ -173,7 +173,6 @@ export class AzureSpeechSession {
       // audioConfig=null evita che l'SDK provi comunque un output automatico via
       // MSE: vogliamo solo il buffer audio, la riproduzione la gestiamo noi.
       this.synthesizer = new sdk.SpeechSynthesizer(speechConfig, null);
-      this.audioEl = new Audio();
     } catch (error) {
       callbacks.onError(error instanceof Error ? error.message : 'Impossibile inizializzare Azure Speech.');
       this.close();
@@ -231,19 +230,31 @@ export class AzureSpeechSession {
 
   private playAudioData(audioData: ArrayBuffer): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (!this.audioEl) {
-        reject(new Error('Elemento audio non disponibile.'));
-        return;
-      }
-      if (this.currentObjectUrl) URL.revokeObjectURL(this.currentObjectUrl);
-      this.currentObjectUrl = URL.createObjectURL(new Blob([audioData], { type: 'audio/mpeg' }));
+      // Un elemento <audio> nuovo per ogni frase, invece di riusare lo stesso:
+      // riassegnare .src sullo stesso elemento subito dopo un 'ended' può
+      // scatenare un evento 'error' spurio in alcuni browser.
+      const url = URL.createObjectURL(new Blob([audioData], { type: 'audio/mpeg' }));
+      const audioEl = new Audio(url);
+      this.audioEl = audioEl;
+      this.currentObjectUrl = url;
 
-      const audioEl = this.audioEl;
-      audioEl.onended = () => resolve();
-      audioEl.onerror = () => reject(new Error('Il browser non riesce a riprodurre l\'audio ricevuto da Azure.'));
-      audioEl.src = this.currentObjectUrl;
+      const cleanup = () => {
+        URL.revokeObjectURL(url);
+        audioEl.onended = null;
+        audioEl.onerror = null;
+      };
+
+      audioEl.onended = () => {
+        cleanup();
+        resolve();
+      };
+      audioEl.onerror = () => {
+        cleanup();
+        reject(new Error('Il browser non riesce a riprodurre l\'audio ricevuto da Azure.'));
+      };
 
       audioEl.play().catch((error) => {
+        cleanup();
         reject(
           new Error(
             error?.name === 'NotAllowedError'
