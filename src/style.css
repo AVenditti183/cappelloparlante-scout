@@ -239,3 +239,10 @@ input[type="range"] {
   border-color: var(--accent-strong);
   flex: 1.4;
 }
+
+.btn-download {
+  background: var(--violet);
+  color: #1c1533;
+  border-color: var(--violet);
+  width: 100%;
+}

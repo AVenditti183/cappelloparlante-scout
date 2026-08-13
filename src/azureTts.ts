@@ -125,6 +125,8 @@ export interface AzureSpeakCallbacks {
   onChunkStart: (index: number, total: number) => void;
   onDone: () => void;
   onError: (message: string) => void;
+  /** Riceve l'audio mp3 grezzo di ogni frase, utile per offrirne il download. */
+  onAudioChunk?: (data: ArrayBuffer) => void;
 }
 
 export class AzureSpeechSession {
@@ -172,6 +174,7 @@ export class AzureSpeechSession {
       try {
         const audioData = await this.synthesizeChunk(ssml);
         if (this.cancelled) return;
+        callbacks.onAudioChunk?.(audioData);
         await this.playAudioData(audioData);
       } catch (error) {
         if (!this.cancelled) {

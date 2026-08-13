@@ -29,6 +29,7 @@ const statusEl = document.querySelector<HTMLParagraphElement>('#status')!;
 const btnPlay = document.querySelector<HTMLButtonElement>('#btn-play')!;
 const btnPause = document.querySelector<HTMLButtonElement>('#btn-pause')!;
 const btnStop = document.querySelector<HTMLButtonElement>('#btn-stop')!;
+const btnDownload = document.querySelector<HTMLButtonElement>('#btn-download')!;
 
 type Accent = 'it' | 'en';
 type Engine = 'browser' | 'azure';
@@ -95,6 +96,7 @@ let isSpeaking = false;
 let isPaused = false;
 let voicesReady = false;
 let azureSession: AzureSpeechSession | null = null;
+let lastAudioChunks: ArrayBuffer[] = [];
 
 textInput.value = settings.text;
 rateInput.value = String(settings.rate);
@@ -403,6 +405,7 @@ engineBrowserBtn.addEventListener('click', () => {
   settings.engine = 'browser';
   saveSettings({ engine: 'browser' });
   setEngineButtons('browser');
+  btnDownload.hidden = true;
   azurePanel.hidden = true;
   refreshVoiceOptions();
 });
@@ -669,6 +672,8 @@ function speakWithAzure(chunks: string[]) {
   azureSession?.stop();
   azureSession = new AzureSpeechSession();
   setSpeakingState(true);
+  lastAudioChunks = [];
+  btnDownload.hidden = true;
 
   const total = effectiveChunks.length;
   void azureSession.speak(
@@ -684,9 +689,11 @@ function speakWithAzure(chunks: string[]) {
     },
     {
       onChunkStart: (index) => setStatus(total > 1 ? `Frase ${index + 1} di ${total}...` : 'In riproduzione...'),
+      onAudioChunk: (data) => lastAudioChunks.push(data),
       onDone: () => {
         setSpeakingState(false);
         setStatus('Riproduzione completata.');
+        if (lastAudioChunks.length) btnDownload.hidden = false;
       },
       onError: (message) => {
         setSpeakingState(false);
@@ -712,6 +719,17 @@ function stopCurrentEngine() {
 }
 
 btnPlay.addEventListener('click', speak);
+
+btnDownload.addEventListener('click', () => {
+  if (!lastAudioChunks.length) return;
+  const blob = new Blob(lastAudioChunks, { type: 'audio/mpeg' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'cappello-parlante.mp3';
+  link.click();
+  URL.revokeObjectURL(url);
+});
 
 btnPause.addEventListener('click', () => {
   if (!isSpeaking) return;
