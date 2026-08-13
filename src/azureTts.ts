@@ -25,6 +25,13 @@ const STYLE_LABELS: Record<string, string> = {
   unfriendly: 'Scortese',
   assistant: 'Assistente',
   customerservice: 'Servizio clienti',
+  // Tag paralinguistici, disponibili solo sulle voci HD (DragonHD)
+  sighing: 'Sospiro',
+  laughter: 'Risata',
+  coughing: 'Colpo di tosse',
+  throat_clearing: 'Schiarita di voce',
+  breathing: 'Respiro',
+  yawning: 'Sbadiglio',
 };
 
 export function styleLabel(style: string): string {
@@ -42,10 +49,38 @@ export const AZURE_VOICES: AzureVoiceOption[] = [
   // Voci "HD" (DragonHD): la generazione piu' realistica, basata su LLM, che
   // adatta automaticamente tono ed emozione al contesto. In preview, disponibili
   // solo su risorse Azure create in una delle regioni elencate in HD_REGIONS.
-  { shortName: 'it-IT-Alessio:DragonHDLatestNeural', label: 'Alessio (HD)', lang: 'it-IT', gender: 'M', styles: [], restrictedRegions: HD_REGIONS },
-  { shortName: 'it-IT-Isabella:DragonHDLatestNeural', label: 'Isabella (HD)', lang: 'it-IT', gender: 'F', styles: [], restrictedRegions: HD_REGIONS },
-  { shortName: 'en-US-Andrew:DragonHDLatestNeural', label: 'Andrew (HD)', lang: 'en-US', gender: 'M', styles: [], restrictedRegions: HD_REGIONS },
-  { shortName: 'en-US-Ava:DragonHDLatestNeural', label: 'Ava (HD)', lang: 'en-US', gender: 'F', styles: [], restrictedRegions: HD_REGIONS },
+  {
+    shortName: 'it-IT-Alessio:DragonHDLatestNeural',
+    label: 'Alessio (HD)',
+    lang: 'it-IT',
+    gender: 'M',
+    styles: ['sighing', 'laughter', 'coughing', 'throat_clearing', 'breathing', 'yawning'],
+    restrictedRegions: HD_REGIONS,
+  },
+  {
+    shortName: 'it-IT-Isabella:DragonHDLatestNeural',
+    label: 'Isabella (HD)',
+    lang: 'it-IT',
+    gender: 'F',
+    styles: ['sighing', 'laughter', 'coughing', 'throat_clearing', 'breathing', 'yawning'],
+    restrictedRegions: HD_REGIONS,
+  },
+  {
+    shortName: 'en-US-Andrew:DragonHDLatestNeural',
+    label: 'Andrew (HD)',
+    lang: 'en-US',
+    gender: 'M',
+    styles: ['sighing', 'laughter', 'coughing', 'throat_clearing', 'breathing', 'yawning'],
+    restrictedRegions: HD_REGIONS,
+  },
+  {
+    shortName: 'en-US-Ava:DragonHDLatestNeural',
+    label: 'Ava (HD)',
+    lang: 'en-US',
+    gender: 'F',
+    styles: ['sighing', 'laughter', 'coughing', 'throat_clearing', 'breathing', 'yawning'],
+    restrictedRegions: HD_REGIONS,
+  },
   // Voci "Multilingual", generazione piu' recente: nessuno stile SSML ma
   // naturalezza di base superiore alle Neural standard sottostanti.
   { shortName: 'it-IT-AlessioMultilingualNeural', label: 'Alessio (naturale)', lang: 'it-IT', gender: 'M', styles: [] },
