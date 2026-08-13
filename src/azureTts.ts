@@ -128,6 +128,16 @@ export function pickDefaultAzureVoice(langPrefix: 'it' | 'en'): AzureVoiceOption
   return candidates.find((v) => v.gender === 'M') ?? candidates[0];
 }
 
+// Le voci "DragonHD" (non Omni) supportano solo un sottoinsieme minimo di
+// SSML: niente <prosody> (quindi tono/velocita' non hanno alcun effetto),
+// niente <emphasis>, niente <mstts:express-as> e niente
+// <mstts:backgroundaudio>. Stili e tag paralinguistici funzionano solo come
+// marcatore testuale "[stile]" dentro il testo stesso.
+// Fonte: https://learn.microsoft.com/azure/ai-services/speech-service/high-definition-voices
+export function isDragonHD(voice: AzureVoiceOption): boolean {
+  return voice.shortName.includes(':DragonHD');
+}
+
 function escapeSsml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -173,6 +183,17 @@ function buildSsml(
   style: string,
   background?: BackgroundAudio,
 ): string {
+  if (isDragonHD(voice)) {
+    // Nessun <prosody>/<emphasis>/<mstts:express-as>/<mstts:backgroundaudio>:
+    // l'unica leva rimasta e' il marcatore testuale per stili/paralinguistica.
+    const marker = style && voice.styles.includes(style) ? `[${style}] ` : '';
+    return (
+      `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="${voice.lang}">` +
+      `<voice name="${voice.shortName}">${marker}${escapeSsml(text)}</voice>` +
+      `</speak>`
+    );
+  }
+
   const prosody = `<prosody rate="${rate}" pitch="${pitchToPercent(pitch)}">${emphasizeAllCaps(text)}</prosody>`;
   const expressive = style && voice.styles.includes(style) ? `<mstts:express-as style="${style}">${prosody}</mstts:express-as>` : prosody;
   const leadIn = background && background.leadInMs > 0 ? `<break time="${background.leadInMs}ms"/>` : '';

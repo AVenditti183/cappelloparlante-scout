@@ -1,5 +1,5 @@
 import './style.css';
-import { AZURE_VOICES, AzureSpeechSession, pickDefaultAzureVoice, styleLabel } from './azureTts';
+import { AZURE_VOICES, AzureSpeechSession, isDragonHD, pickDefaultAzureVoice, styleLabel } from './azureTts';
 
 const textInput = document.querySelector<HTMLTextAreaElement>('#text-input')!;
 const voiceSelect = document.querySelector<HTMLSelectElement>('#voice-select')!;
@@ -322,14 +322,23 @@ function refreshVoiceRegionHint() {
     return;
   }
   const voice = AZURE_VOICES.find((v) => v.shortName === voiceSelect.value);
-  if (!voice?.restrictedRegions || voice.restrictedRegions.includes(azureRegionSelect.value)) {
-    voiceRegionHint.hidden = true;
-    return;
+  const notes: string[] = [];
+
+  if (voice?.restrictedRegions && !voice.restrictedRegions.includes(azureRegionSelect.value)) {
+    notes.push(
+      `⚠️ Voce in preview: funziona solo con una risorsa Azure creata in una di queste regioni — ` +
+        `${voice.restrictedRegions.join(', ')}. La regione impostata ora è "${azureRegionSelect.value}".`,
+    );
   }
-  voiceRegionHint.hidden = false;
-  voiceRegionHint.textContent =
-    `⚠️ Voce in preview: funziona solo con una risorsa Azure creata in una di queste regioni — ` +
-    `${voice.restrictedRegions.join(', ')}. La regione impostata ora è "${azureRegionSelect.value}".`;
+
+  if (voice && isDragonHD(voice)) {
+    notes.push(
+      'ℹ️ Le voci HD non supportano velocità, tono, enfasi sul maiuscolo né audio di sottofondo (limite di Azure, non dell\'app): solo l\'espressione scelta sopra ha effetto.',
+    );
+  }
+
+  voiceRegionHint.hidden = notes.length === 0;
+  voiceRegionHint.textContent = notes.join(' ');
 }
 
 function setAccentButtons(accent: Accent) {
