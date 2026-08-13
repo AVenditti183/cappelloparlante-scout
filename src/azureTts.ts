@@ -6,6 +6,8 @@ export interface AzureVoiceOption {
   lang: string;
   gender: 'M' | 'F';
   styles: string[];
+  /** Se presente, la voce e' in preview e funziona solo con una risorsa Azure creata in una di queste regioni. */
+  restrictedRegions?: string[];
 }
 
 const STYLE_LABELS: Record<string, string> = {
@@ -34,7 +36,16 @@ export function styleLabel(style: string): string {
 // la documentazione ufficiale.
 // (l'elenco completo si potrebbe ottenere via synthesizer.getVoicesAsync(),
 // ma un set curato evita una chiamata di rete extra prima di poter parlare)
+const HD_REGIONS = ['eastus', 'westeurope', 'southeastasia'];
+
 export const AZURE_VOICES: AzureVoiceOption[] = [
+  // Voci "HD" (DragonHD): la generazione piu' realistica, basata su LLM, che
+  // adatta automaticamente tono ed emozione al contesto. In preview, disponibili
+  // solo su risorse Azure create in una delle regioni elencate in HD_REGIONS.
+  { shortName: 'it-IT-Alessio:DragonHDLatestNeural', label: 'Alessio (HD)', lang: 'it-IT', gender: 'M', styles: [], restrictedRegions: HD_REGIONS },
+  { shortName: 'it-IT-Isabella:DragonHDLatestNeural', label: 'Isabella (HD)', lang: 'it-IT', gender: 'F', styles: [], restrictedRegions: HD_REGIONS },
+  { shortName: 'en-US-Andrew:DragonHDLatestNeural', label: 'Andrew (HD)', lang: 'en-US', gender: 'M', styles: [], restrictedRegions: HD_REGIONS },
+  { shortName: 'en-US-Ava:DragonHDLatestNeural', label: 'Ava (HD)', lang: 'en-US', gender: 'F', styles: [], restrictedRegions: HD_REGIONS },
   // Voci "Multilingual", generazione piu' recente: nessuno stile SSML ma
   // naturalezza di base superiore alle Neural standard sottostanti.
   { shortName: 'it-IT-AlessioMultilingualNeural', label: 'Alessio (naturale)', lang: 'it-IT', gender: 'M', styles: [] },
@@ -76,7 +87,9 @@ export const AZURE_VOICES: AzureVoiceOption[] = [
 ];
 
 export function pickDefaultAzureVoice(langPrefix: 'it' | 'en'): AzureVoiceOption {
-  const candidates = AZURE_VOICES.filter((v) => v.lang.toLowerCase().startsWith(langPrefix));
+  // Le voci con restrictedRegions richiedono una risorsa Azure creata in una
+  // regione specifica: non vanno mai scelte automaticamente, solo a mano.
+  const candidates = AZURE_VOICES.filter((v) => v.lang.toLowerCase().startsWith(langPrefix) && !v.restrictedRegions);
   return candidates.find((v) => v.gender === 'M') ?? candidates[0];
 }
 

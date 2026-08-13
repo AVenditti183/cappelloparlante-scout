@@ -10,6 +10,7 @@ const engineAzureBtn = document.querySelector<HTMLButtonElement>('#engine-azure'
 const azurePanel = document.querySelector<HTMLDivElement>('#azure-panel')!;
 const azureRegionSelect = document.querySelector<HTMLSelectElement>('#azure-region')!;
 const azureKeyInput = document.querySelector<HTMLInputElement>('#azure-key')!;
+const voiceRegionHint = document.querySelector<HTMLParagraphElement>('#voice-region-hint')!;
 const styleField = document.querySelector<HTMLDivElement>('#style-field')!;
 const styleSelect = document.querySelector<HTMLSelectElement>('#style-select')!;
 const bgSelect = document.querySelector<HTMLSelectElement>('#azure-bg-select')!;
@@ -218,6 +219,7 @@ function populateBrowserVoices(): boolean {
 
   voicesReady = true;
   refreshStyleOptions();
+  refreshVoiceRegionHint();
   return true;
 }
 
@@ -249,6 +251,7 @@ function populateAzureVoiceSelect() {
 
   voicesReady = true;
   refreshStyleOptions();
+  refreshVoiceRegionHint();
 }
 
 function applyAccentDefaultVoice(accent: Accent, browserVoices?: SpeechSynthesisVoice[]) {
@@ -260,6 +263,7 @@ function applyAccentDefaultVoice(accent: Accent, browserVoices?: SpeechSynthesis
       saveSettings({ azureVoice: best.shortName });
     }
     refreshStyleOptions();
+  refreshVoiceRegionHint();
     return;
   }
 
@@ -274,6 +278,7 @@ function applyAccentDefaultVoice(accent: Accent, browserVoices?: SpeechSynthesis
     saveSettings({ voiceURI: best.voiceURI });
   }
   refreshStyleOptions();
+  refreshVoiceRegionHint();
 }
 
 function refreshStyleOptions() {
@@ -309,6 +314,22 @@ function refreshStyleOptions() {
     settings.azureStyle = validStyle;
     saveSettings({ azureStyle: validStyle });
   }
+}
+
+function refreshVoiceRegionHint() {
+  if (settings.engine !== 'azure') {
+    voiceRegionHint.hidden = true;
+    return;
+  }
+  const voice = AZURE_VOICES.find((v) => v.shortName === voiceSelect.value);
+  if (!voice?.restrictedRegions || voice.restrictedRegions.includes(azureRegionSelect.value)) {
+    voiceRegionHint.hidden = true;
+    return;
+  }
+  voiceRegionHint.hidden = false;
+  voiceRegionHint.textContent =
+    `⚠️ Voce in preview: funziona solo con una risorsa Azure creata in una di queste regioni — ` +
+    `${voice.restrictedRegions.join(', ')}. La regione impostata ora è "${azureRegionSelect.value}".`;
 }
 
 function setAccentButtons(accent: Accent) {
@@ -427,6 +448,7 @@ engineAzureBtn.addEventListener('click', () => {
 azureRegionSelect.addEventListener('change', () => {
   settings.azureRegion = azureRegionSelect.value;
   saveSettings({ azureRegion: azureRegionSelect.value });
+  refreshVoiceRegionHint();
 });
 
 azureKeyInput.addEventListener('input', () => {
@@ -478,6 +500,7 @@ voiceSelect.addEventListener('change', () => {
       saveSettings({ accent: matchedAccent });
     }
     refreshStyleOptions();
+  refreshVoiceRegionHint();
     return;
   }
 
