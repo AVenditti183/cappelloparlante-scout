@@ -351,11 +351,18 @@ function refreshVoiceRegionHint() {
     );
   }
 
-  if (voice && isDragonHD(voice)) {
+  const hdSelected = Boolean(voice && isDragonHD(voice));
+  if (hdSelected) {
     notes.push(
       'ℹ️ Le voci HD non supportano velocità, tono, enfasi sul maiuscolo né audio di sottofondo (limite di Azure, non dell\'app): solo l\'espressione scelta sopra ha effetto.',
     );
   }
+
+  bgSelect.disabled = hdSelected;
+  bgVolumeInput.disabled = hdSelected;
+  bgFadeInInput.disabled = hdSelected;
+  bgFadeOutInput.disabled = hdSelected;
+  if (hdSelected) bgUrlField.hidden = true;
 
   voiceRegionHint.hidden = notes.length === 0;
   voiceRegionHint.textContent = notes.join(' ');
@@ -715,7 +722,10 @@ function speakWithAzure(chunks: string[]) {
     return;
   }
 
-  const bgUrl = resolveBackgroundAudioUrl();
+  // Le voci HD non supportano <mstts:backgroundaudio>: qualunque sottofondo
+  // rimasto selezionato in precedenza (il controllo e' disabilitato ma
+  // mantiene il suo valore) va ignorato.
+  const bgUrl = isDragonHD(voice) ? '' : resolveBackgroundAudioUrl();
   // Con audio di sottofondo l'intero testo va in un'unica richiesta: il tag
   // mstts:backgroundaudio riparte da capo a ogni <speak>, quindi spezzettare
   // per frase farebbe ripartire la traccia a ogni frase.

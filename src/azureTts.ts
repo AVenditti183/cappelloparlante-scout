@@ -323,6 +323,11 @@ export class AzureSpeechSession {
       // audioConfig=null evita che l'SDK provi comunque un output automatico via
       // MSE: vogliamo solo il buffer audio, la riproduzione la gestiamo noi.
       this.synthesizer = new sdk.SpeechSynthesizer(speechConfig, null);
+      // Un solo elemento <audio>, creato subito nel gesture dell'utente (il
+      // click su "Ascolta") e poi riusato per ogni frase: sui browser mobile
+      // il permesso di autoplay si "sblocca" per elemento, un elemento nuovo
+      // per ogni frase richiederebbe un nuovo sblocco che spesso non arriva.
+      this.audioEl = new Audio();
     } catch (error) {
       callbacks.onError(error instanceof Error ? error.message : 'Impossibile inizializzare Azure Speech.');
       this.close();
@@ -380,16 +385,30 @@ export class AzureSpeechSession {
 
   private playAudioData(audioData: ArrayBuffer): Promise<void> {
     return new Promise((resolve, reject) => {
-      // Un elemento <audio> nuovo per ogni frase, invece di riusare lo stesso:
-      // riassegnare .src sullo stesso elemento subito dopo un 'ended' può
-      // scatenare un evento 'error' spurio in alcuni browser.
+      if (!this.audioEl) {
+        reject(new Error('Elemento audio non disponibile.'));
+        return;
+      }
+      const audioEl = this.audioEl;
+
+      // Reset esplicito prima di riassegnare .src, per evitare l'evento
+      // 'error' spurio che puo' scattare riassegnando la sorgente subito
+      // dopo un 'ended' sullo stesso elemento.
+      audioEl.pause();
+      audioEl.removeAttribute('src');
+      audioEl.load();
+
+      if (this.currentObjectUrl) URL.revokeObjectURL(this.currentObjectUrl);
       const url = URL.createObjectURL(new Blob([audioData], { type: 'audio/mpeg' }));
-      const audioEl = new Audio(url);
-      this.audioEl = audioEl;
       this.currentObjectUrl = url;
 
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error('La riproduzione non è partita entro 30 secondi (possibile blocco del browser).'));
+      }, 30000);
+
       const cleanup = () => {
-        URL.revokeObjectURL(url);
+        clearTimeout(timeout);
         audioEl.onended = null;
         audioEl.onerror = null;
       };
@@ -403,6 +422,7 @@ export class AzureSpeechSession {
         reject(new Error('Il browser non riesce a riprodurre l\'audio ricevuto da Azure.'));
       };
 
+      audioEl.src = url;
       audioEl.play().catch((error) => {
         cleanup();
         reject(
