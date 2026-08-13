@@ -58,7 +58,7 @@ const STORAGE_KEY = 'cappello-parlante:settings';
 const defaultSettings: Settings = {
   voiceURI: null,
   azureVoice: null,
-  azureRegion: 'italynorth',
+  azureRegion: 'westeurope',
   azureKey: '',
   azureStyle: '',
   azureBgSelection: '',
