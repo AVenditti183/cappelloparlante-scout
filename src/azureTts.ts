@@ -102,6 +102,25 @@ function pitchToPercent(pitch: number): string {
   return `${percent >= 0 ? '+' : ''}${percent}%`;
 }
 
+// Cattura sequenze di parole TUTTE IN MAIUSCOLO (almeno 2 lettere ciascuna) per
+// enfatizzarle. <emphasis> da solo e' garantito solo su 3 voci inglesi US, quindi
+// aggiungiamo anche una spinta di tono/volume via <prosody>, che funziona su
+// qualsiasi voce neurale Azure.
+const ALLCAPS_RUN = /[A-ZÀÈÉÌÍÎÒÓÙÚ]{2,}(?:[ '-][A-ZÀÈÉÌÍÎÒÓÙÚ]{2,})*/g;
+
+function emphasizeAllCaps(text: string): string {
+  let result = '';
+  let lastIndex = 0;
+  for (const match of text.matchAll(ALLCAPS_RUN)) {
+    result += escapeSsml(text.slice(lastIndex, match.index));
+    result +=
+      `<prosody pitch="+8%" volume="+20%"><emphasis level="strong">${escapeSsml(match[0])}</emphasis></prosody>`;
+    lastIndex = match.index! + match[0].length;
+  }
+  result += escapeSsml(text.slice(lastIndex));
+  return result;
+}
+
 export interface BackgroundAudio {
   url: string;
   volume: number;
@@ -119,7 +138,7 @@ function buildSsml(
   style: string,
   background?: BackgroundAudio,
 ): string {
-  const prosody = `<prosody rate="${rate}" pitch="${pitchToPercent(pitch)}">${escapeSsml(text)}</prosody>`;
+  const prosody = `<prosody rate="${rate}" pitch="${pitchToPercent(pitch)}">${emphasizeAllCaps(text)}</prosody>`;
   const expressive = style && voice.styles.includes(style) ? `<mstts:express-as style="${style}">${prosody}</mstts:express-as>` : prosody;
   const leadIn = background && background.leadInMs > 0 ? `<break time="${background.leadInMs}ms"/>` : '';
   const body = leadIn + expressive;
