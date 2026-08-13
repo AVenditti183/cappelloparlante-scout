@@ -5,23 +5,68 @@ export interface AzureVoiceOption {
   label: string;
   lang: string;
   gender: 'M' | 'F';
+  styles: string[];
 }
 
-// Voci neurali Azure stabili e ben documentate per italiano e inglese.
+const STYLE_LABELS: Record<string, string> = {
+  cheerful: 'Allegro',
+  sad: 'Triste',
+  excited: 'Eccitato',
+  whispering: 'Sussurrato',
+  chat: 'Colloquiale',
+  angry: 'Arrabbiato',
+  friendly: 'Amichevole',
+  hopeful: 'Speranzoso',
+  newscast: 'Da telegiornale',
+  shouting: 'Urlato',
+  terrified: 'Terrorizzato',
+  unfriendly: 'Scortese',
+  assistant: 'Assistente',
+  customerservice: 'Servizio clienti',
+};
+
+export function styleLabel(style: string): string {
+  return STYLE_LABELS[style] ?? style;
+}
+
+// Voci neurali Azure stabili e ben documentate per italiano e inglese, con gli
+// stili SSML (mstts:express-as) realmente supportati da ciascuna voce secondo
+// la documentazione ufficiale.
 // (l'elenco completo si potrebbe ottenere via synthesizer.getVoicesAsync(),
 // ma un set curato evita una chiamata di rete extra prima di poter parlare)
 export const AZURE_VOICES: AzureVoiceOption[] = [
-  { shortName: 'it-IT-DiegoNeural', label: 'Diego', lang: 'it-IT', gender: 'M' },
-  { shortName: 'it-IT-GianniNeural', label: 'Gianni', lang: 'it-IT', gender: 'M' },
-  { shortName: 'it-IT-RinaldoNeural', label: 'Rinaldo', lang: 'it-IT', gender: 'M' },
-  { shortName: 'it-IT-ElsaNeural', label: 'Elsa', lang: 'it-IT', gender: 'F' },
-  { shortName: 'it-IT-IsabellaNeural', label: 'Isabella', lang: 'it-IT', gender: 'F' },
-  { shortName: 'en-GB-RyanNeural', label: 'Ryan (UK)', lang: 'en-GB', gender: 'M' },
-  { shortName: 'en-GB-ThomasNeural', label: 'Thomas (UK)', lang: 'en-GB', gender: 'M' },
-  { shortName: 'en-GB-SoniaNeural', label: 'Sonia (UK)', lang: 'en-GB', gender: 'F' },
-  { shortName: 'en-US-GuyNeural', label: 'Guy (US)', lang: 'en-US', gender: 'M' },
-  { shortName: 'en-US-ChristopherNeural', label: 'Christopher (US)', lang: 'en-US', gender: 'M' },
-  { shortName: 'en-US-JennyNeural', label: 'Jenny (US)', lang: 'en-US', gender: 'F' },
+  { shortName: 'it-IT-DiegoNeural', label: 'Diego', lang: 'it-IT', gender: 'M', styles: ['cheerful', 'excited', 'sad'] },
+  { shortName: 'it-IT-GianniNeural', label: 'Gianni', lang: 'it-IT', gender: 'M', styles: [] },
+  { shortName: 'it-IT-RinaldoNeural', label: 'Rinaldo', lang: 'it-IT', gender: 'M', styles: [] },
+  { shortName: 'it-IT-ElsaNeural', label: 'Elsa', lang: 'it-IT', gender: 'F', styles: [] },
+  {
+    shortName: 'it-IT-IsabellaNeural',
+    label: 'Isabella',
+    lang: 'it-IT',
+    gender: 'F',
+    styles: ['chat', 'cheerful', 'excited', 'sad', 'whispering'],
+  },
+  { shortName: 'en-GB-RyanNeural', label: 'Ryan (UK)', lang: 'en-GB', gender: 'M', styles: ['chat', 'cheerful', 'sad', 'whispering'] },
+  { shortName: 'en-GB-ThomasNeural', label: 'Thomas (UK)', lang: 'en-GB', gender: 'M', styles: [] },
+  { shortName: 'en-GB-SoniaNeural', label: 'Sonia (UK)', lang: 'en-GB', gender: 'F', styles: ['cheerful', 'sad'] },
+  {
+    shortName: 'en-US-GuyNeural',
+    label: 'Guy (US)',
+    lang: 'en-US',
+    gender: 'M',
+    styles: ['angry', 'cheerful', 'excited', 'friendly', 'hopeful', 'newscast', 'sad', 'shouting', 'terrified', 'unfriendly', 'whispering'],
+  },
+  { shortName: 'en-US-ChristopherNeural', label: 'Christopher (US)', lang: 'en-US', gender: 'M', styles: [] },
+  {
+    shortName: 'en-US-JennyNeural',
+    label: 'Jenny (US)',
+    lang: 'en-US',
+    gender: 'F',
+    styles: [
+      'angry', 'assistant', 'chat', 'cheerful', 'customerservice', 'excited',
+      'friendly', 'hopeful', 'newscast', 'sad', 'shouting', 'terrified', 'unfriendly', 'whispering',
+    ],
+  },
 ];
 
 export function pickDefaultAzureVoice(langPrefix: 'it' | 'en'): AzureVoiceOption {
@@ -38,12 +83,13 @@ function pitchToPercent(pitch: number): string {
   return `${percent >= 0 ? '+' : ''}${percent}%`;
 }
 
-function buildSsml(text: string, voice: AzureVoiceOption, rate: number, pitch: number): string {
+function buildSsml(text: string, voice: AzureVoiceOption, rate: number, pitch: number, style: string): string {
+  const prosody = `<prosody rate="${rate}" pitch="${pitchToPercent(pitch)}">${escapeSsml(text)}</prosody>`;
+  const body = style && voice.styles.includes(style) ? `<mstts:express-as style="${style}">${prosody}</mstts:express-as>` : prosody;
   return (
-    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${voice.lang}">` +
-    `<voice name="${voice.shortName}">` +
-    `<prosody rate="${rate}" pitch="${pitchToPercent(pitch)}">${escapeSsml(text)}</prosody>` +
-    `</voice></speak>`
+    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="${voice.lang}">` +
+    `<voice name="${voice.shortName}">${body}</voice>` +
+    `</speak>`
   );
 }
 
@@ -61,7 +107,7 @@ export class AzureSpeechSession {
 
   async speak(
     chunks: string[],
-    config: { key: string; region: string; voice: AzureVoiceOption; rate: number; pitch: number },
+    config: { key: string; region: string; voice: AzureVoiceOption; rate: number; pitch: number; style: string },
     callbacks: AzureSpeakCallbacks,
   ): Promise<void> {
     const speechConfig = sdk.SpeechConfig.fromSubscription(config.key, config.region);
@@ -74,7 +120,7 @@ export class AzureSpeechSession {
     for (let index = 0; index < chunks.length; index += 1) {
       if (this.cancelled) return;
       callbacks.onChunkStart(index, chunks.length);
-      const ssml = buildSsml(chunks[index], config.voice, config.rate, config.pitch);
+      const ssml = buildSsml(chunks[index], config.voice, config.rate, config.pitch, config.style);
       try {
         await this.speakChunk(ssml);
       } catch (error) {

@@ -1,5 +1,5 @@
 import './style.css';
-import { AZURE_VOICES, AzureSpeechSession, pickDefaultAzureVoice } from './azureTts';
+import { AZURE_VOICES, AzureSpeechSession, pickDefaultAzureVoice, styleLabel } from './azureTts';
 
 const textInput = document.querySelector<HTMLTextAreaElement>('#text-input')!;
 const voiceSelect = document.querySelector<HTMLSelectElement>('#voice-select')!;
@@ -10,6 +10,8 @@ const engineAzureBtn = document.querySelector<HTMLButtonElement>('#engine-azure'
 const azurePanel = document.querySelector<HTMLDivElement>('#azure-panel')!;
 const azureRegionSelect = document.querySelector<HTMLSelectElement>('#azure-region')!;
 const azureKeyInput = document.querySelector<HTMLInputElement>('#azure-key')!;
+const styleField = document.querySelector<HTMLDivElement>('#style-field')!;
+const styleSelect = document.querySelector<HTMLSelectElement>('#style-select')!;
 const rateInput = document.querySelector<HTMLInputElement>('#rate-input')!;
 const pitchInput = document.querySelector<HTMLInputElement>('#pitch-input')!;
 const rateValue = document.querySelector<HTMLSpanElement>('#rate-value')!;
@@ -27,6 +29,7 @@ interface Settings {
   azureVoice: string | null;
   azureRegion: string;
   azureKey: string;
+  azureStyle: string;
   engine: Engine;
   rate: number;
   pitch: number;
@@ -41,6 +44,7 @@ const defaultSettings: Settings = {
   azureVoice: null,
   azureRegion: 'italynorth',
   azureKey: '',
+  azureStyle: '',
   engine: 'browser',
   rate: 0.95,
   pitch: 1,
@@ -179,6 +183,7 @@ function populateBrowserVoices(): boolean {
   }
 
   voicesReady = true;
+  refreshStyleOptions();
   return true;
 }
 
@@ -209,6 +214,7 @@ function populateAzureVoiceSelect() {
   }
 
   voicesReady = true;
+  refreshStyleOptions();
 }
 
 function applyAccentDefaultVoice(accent: Accent, browserVoices?: SpeechSynthesisVoice[]) {
@@ -219,6 +225,7 @@ function applyAccentDefaultVoice(accent: Accent, browserVoices?: SpeechSynthesis
       settings.azureVoice = best.shortName;
       saveSettings({ azureVoice: best.shortName });
     }
+    refreshStyleOptions();
     return;
   }
 
@@ -231,6 +238,42 @@ function applyAccentDefaultVoice(accent: Accent, browserVoices?: SpeechSynthesis
     voiceSelect.value = best.voiceURI;
     settings.voiceURI = best.voiceURI;
     saveSettings({ voiceURI: best.voiceURI });
+  }
+  refreshStyleOptions();
+}
+
+function refreshStyleOptions() {
+  if (settings.engine !== 'azure') {
+    styleField.hidden = true;
+    return;
+  }
+
+  const voice = AZURE_VOICES.find((v) => v.shortName === voiceSelect.value);
+  if (!voice || voice.styles.length === 0) {
+    styleField.hidden = true;
+    styleSelect.innerHTML = '<option value="">Nessuna (neutra)</option>';
+    styleSelect.value = '';
+    if (settings.azureStyle) {
+      settings.azureStyle = '';
+      saveSettings({ azureStyle: '' });
+    }
+    return;
+  }
+
+  styleField.hidden = false;
+  styleSelect.innerHTML = '<option value="">Nessuna (neutra)</option>';
+  for (const style of voice.styles) {
+    const option = document.createElement('option');
+    option.value = style;
+    option.textContent = styleLabel(style);
+    styleSelect.appendChild(option);
+  }
+
+  const validStyle = voice.styles.includes(settings.azureStyle) ? settings.azureStyle : '';
+  styleSelect.value = validStyle;
+  if (validStyle !== settings.azureStyle) {
+    settings.azureStyle = validStyle;
+    saveSettings({ azureStyle: validStyle });
   }
 }
 
@@ -331,6 +374,7 @@ voiceSelect.addEventListener('change', () => {
       setAccentButtons(matchedAccent);
       saveSettings({ accent: matchedAccent });
     }
+    refreshStyleOptions();
     return;
   }
 
@@ -345,6 +389,11 @@ voiceSelect.addEventListener('change', () => {
     setAccentButtons(matchedAccent);
     saveSettings({ accent: matchedAccent });
   }
+});
+
+styleSelect.addEventListener('change', () => {
+  settings.azureStyle = styleSelect.value;
+  saveSettings({ azureStyle: styleSelect.value });
 });
 
 rateInput.addEventListener('input', () => {
@@ -489,7 +538,14 @@ function speakWithAzure(chunks: string[]) {
   const total = chunks.length;
   void azureSession.speak(
     chunks,
-    { key, region, voice, rate: parseFloat(rateInput.value), pitch: parseFloat(pitchInput.value) },
+    {
+      key,
+      region,
+      voice,
+      rate: parseFloat(rateInput.value),
+      pitch: parseFloat(pitchInput.value),
+      style: styleSelect.value,
+    },
     {
       onChunkStart: (index) => setStatus(total > 1 ? `Frase ${index + 1} di ${total}...` : 'In riproduzione...'),
       onDone: () => {

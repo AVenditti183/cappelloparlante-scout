@@ -16,6 +16,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
@@ -113,10 +117,6 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 14px;
-}
-
-.azure-panel[hidden] {
-  display: none;
 }
 
 .azure-hint {
