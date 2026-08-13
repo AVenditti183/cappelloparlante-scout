@@ -110,12 +110,21 @@ export class AzureSpeechSession {
     config: { key: string; region: string; voice: AzureVoiceOption; rate: number; pitch: number; style: string },
     callbacks: AzureSpeakCallbacks,
   ): Promise<void> {
-    const speechConfig = sdk.SpeechConfig.fromSubscription(config.key, config.region);
-    speechConfig.speechSynthesisVoiceName = config.voice.shortName;
+    try {
+      const speechConfig = sdk.SpeechConfig.fromSubscription(config.key, config.region);
+      speechConfig.speechSynthesisVoiceName = config.voice.shortName;
+      // Mp3 ha il supporto di playback via Media Source Extensions piu' affidabile
+      // su Chrome/Safari mobile rispetto ai formati PCM/Opus di default dell'SDK.
+      speechConfig.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Audio24Khz96KBitRateMonoMp3;
 
-    this.player = new sdk.SpeakerAudioDestination();
-    const audioConfig = sdk.AudioConfig.fromSpeakerOutput(this.player);
-    this.synthesizer = new sdk.SpeechSynthesizer(speechConfig, audioConfig);
+      this.player = new sdk.SpeakerAudioDestination();
+      const audioConfig = sdk.AudioConfig.fromSpeakerOutput(this.player);
+      this.synthesizer = new sdk.SpeechSynthesizer(speechConfig, audioConfig);
+    } catch (error) {
+      callbacks.onError(error instanceof Error ? error.message : 'Impossibile inizializzare Azure Speech.');
+      this.close();
+      return;
+    }
 
     for (let index = 0; index < chunks.length; index += 1) {
       if (this.cancelled) return;
@@ -142,16 +151,23 @@ export class AzureSpeechSession {
         reject(new Error('Sintetizzatore non inizializzato.'));
         return;
       }
+      const timeout = setTimeout(() => {
+        reject(new Error('Nessuna risposta da Azure dopo 15 secondi. Controlla la connessione, la chiave e la regione.'));
+      }, 15000);
       this.synthesizer.speakSsmlAsync(
         ssml,
         (result) => {
+          clearTimeout(timeout);
           if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
             resolve();
           } else {
             reject(new Error(result.errorDetails || 'Sintesi Azure non riuscita. Controlla chiave e regione.'));
           }
         },
-        (error) => reject(new Error(error)),
+        (error) => {
+          clearTimeout(timeout);
+          reject(new Error(error));
+        },
       );
     });
   }

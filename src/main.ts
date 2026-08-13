@@ -452,6 +452,17 @@ function setStatus(message: string) {
   statusEl.textContent = message;
 }
 
+window.addEventListener('error', (event) => {
+  setSpeakingState(false);
+  setStatus(`Errore imprevisto: ${event.message}`);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  setSpeakingState(false);
+  const reason = event.reason;
+  setStatus(`Errore imprevisto: ${reason instanceof Error ? reason.message : String(reason)}`);
+});
+
 function setSpeakingState(speaking: boolean) {
   isSpeaking = speaking;
   isPaused = false;
