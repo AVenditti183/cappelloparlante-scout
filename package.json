@@ -12,5 +12,8 @@
   "devDependencies": {
     "typescript": "^7.0.2",
     "vite": "^8.2.1"
+  },
+  "dependencies": {
+    "microsoft-cognitiveservices-speech-sdk": "^1.51.0"
   }
 }

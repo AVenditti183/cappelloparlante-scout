@@ -23,6 +23,39 @@
           spellcheck="true"
         ></textarea>
 
+        <div class="engine-toggle" role="group" aria-label="Motore vocale">
+          <button type="button" id="engine-browser" class="engine-btn is-active" data-engine="browser" aria-pressed="true">
+            Voce di sistema
+          </button>
+          <button type="button" id="engine-azure" class="engine-btn" data-engine="azure" aria-pressed="false">
+            Azure Neural ✨
+          </button>
+        </div>
+
+        <div id="azure-panel" class="azure-panel" hidden>
+          <div class="field">
+            <label for="azure-region">Regione Azure</label>
+            <select id="azure-region">
+              <option value="italynorth">Italia Nord</option>
+              <option value="westeurope">Europa Occidentale</option>
+              <option value="northeurope">Europa Settentrionale</option>
+              <option value="uksouth">UK Sud</option>
+              <option value="francecentral">Francia Centrale</option>
+              <option value="germanywestcentral">Germania Ovest Centrale</option>
+              <option value="eastus">USA Est</option>
+              <option value="westus2">USA Ovest 2</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="azure-key">Chiave API Speech</label>
+            <input type="password" id="azure-key" placeholder="Incolla qui la tua chiave" autocomplete="off" />
+          </div>
+          <p class="azure-hint">
+            La chiave resta solo in questo browser (localStorage) e non viene mai salvata nel codice pubblicato.
+            Puoi crearne una gratuita (500.000 caratteri/mese) su portal.azure.com, risorsa "Servizi voce".
+          </p>
+        </div>
+
         <div class="accent-toggle" role="group" aria-label="Tipo di accento">
           <button type="button" id="accent-it" class="accent-btn" data-lang="it" aria-pressed="false">
             🇮🇹 Voce italiana

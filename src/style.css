@@ -7,6 +7,7 @@
   --text-dim: #9aa7c7;
   --accent: #5eead4;
   --accent-strong: #2dd4bf;
+  --violet: #a78bfa;
   --radius: 14px;
   --control-bar-h: 76px;
 }
@@ -80,9 +81,49 @@ body {
   outline: 2px solid var(--accent);
 }
 
+.engine-toggle,
 .accent-toggle {
   display: flex;
   gap: 8px;
+}
+
+.engine-btn {
+  flex: 1;
+  padding: 12px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  font-weight: 600;
+  min-height: 48px;
+}
+
+.engine-btn.is-active {
+  background: var(--violet);
+  color: #1c1533;
+  border-color: var(--violet);
+}
+
+.azure-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+.azure-panel[hidden] {
+  display: none;
+}
+
+.azure-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  line-height: 1.4;
 }
 
 .accent-btn {
@@ -117,7 +158,8 @@ body {
   align-items: center;
 }
 
-select#voice-select {
+select,
+input[type="password"] {
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
@@ -125,6 +167,8 @@ select#voice-select {
   padding: 12px;
   font-size: 0.95rem;
   min-height: 48px;
+  font-family: inherit;
+  width: 100%;
 }
 
 .sliders {

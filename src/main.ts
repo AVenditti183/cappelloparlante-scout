@@ -1,9 +1,15 @@
 import './style.css';
+import { AZURE_VOICES, AzureSpeechSession, pickDefaultAzureVoice } from './azureTts';
 
 const textInput = document.querySelector<HTMLTextAreaElement>('#text-input')!;
 const voiceSelect = document.querySelector<HTMLSelectElement>('#voice-select')!;
 const accentItBtn = document.querySelector<HTMLButtonElement>('#accent-it')!;
 const accentEnBtn = document.querySelector<HTMLButtonElement>('#accent-en')!;
+const engineBrowserBtn = document.querySelector<HTMLButtonElement>('#engine-browser')!;
+const engineAzureBtn = document.querySelector<HTMLButtonElement>('#engine-azure')!;
+const azurePanel = document.querySelector<HTMLDivElement>('#azure-panel')!;
+const azureRegionSelect = document.querySelector<HTMLSelectElement>('#azure-region')!;
+const azureKeyInput = document.querySelector<HTMLInputElement>('#azure-key')!;
 const rateInput = document.querySelector<HTMLInputElement>('#rate-input')!;
 const pitchInput = document.querySelector<HTMLInputElement>('#pitch-input')!;
 const rateValue = document.querySelector<HTMLSpanElement>('#rate-value')!;
@@ -14,9 +20,14 @@ const btnPause = document.querySelector<HTMLButtonElement>('#btn-pause')!;
 const btnStop = document.querySelector<HTMLButtonElement>('#btn-stop')!;
 
 type Accent = 'it' | 'en';
+type Engine = 'browser' | 'azure';
 
 interface Settings {
   voiceURI: string | null;
+  azureVoice: string | null;
+  azureRegion: string;
+  azureKey: string;
+  engine: Engine;
   rate: number;
   pitch: number;
   accent: Accent;
@@ -27,6 +38,10 @@ const STORAGE_KEY = 'cappello-parlante:settings';
 
 const defaultSettings: Settings = {
   voiceURI: null,
+  azureVoice: null,
+  azureRegion: 'italynorth',
+  azureKey: '',
+  engine: 'browser',
   rate: 0.95,
   pitch: 1,
   accent: 'en',
@@ -52,13 +67,18 @@ const settings = loadSettings();
 let isSpeaking = false;
 let isPaused = false;
 let voicesReady = false;
+let azureSession: AzureSpeechSession | null = null;
 
 textInput.value = settings.text;
 rateInput.value = String(settings.rate);
 pitchInput.value = String(settings.pitch);
 rateValue.textContent = `${settings.rate.toFixed(2)}×`;
 pitchValue.textContent = settings.pitch.toFixed(1);
+azureRegionSelect.value = settings.azureRegion;
+azureKeyInput.value = settings.azureKey;
 setAccentButtons(settings.accent);
+setEngineButtons(settings.engine);
+azurePanel.hidden = settings.engine !== 'azure';
 
 // --- gestione voci ---
 
@@ -118,7 +138,7 @@ function pickBestVoice(
   )[0];
 }
 
-function populateVoices(): boolean {
+function populateBrowserVoices(): boolean {
   const voices = speechSynthesis.getVoices();
   if (!voices.length) return false;
 
@@ -162,13 +182,54 @@ function populateVoices(): boolean {
   return true;
 }
 
-function applyAccentDefaultVoice(accent: Accent, voices: SpeechSynthesisVoice[] = speechSynthesis.getVoices()) {
+function populateAzureVoiceSelect() {
+  voiceSelect.innerHTML = '';
+  const groupOrder: Array<{ key: string; prefix: 'it' | 'en' }> = [
+    { key: 'Italiano', prefix: 'it' },
+    { key: 'Inglese', prefix: 'en' },
+  ];
+  for (const group of groupOrder) {
+    const optgroup = document.createElement('optgroup');
+    optgroup.label = group.key;
+    for (const voice of AZURE_VOICES.filter((v) => v.lang.toLowerCase().startsWith(group.prefix))) {
+      const option = document.createElement('option');
+      option.value = voice.shortName;
+      option.textContent = `${voice.label} (${voice.lang})`;
+      optgroup.appendChild(option);
+    }
+    voiceSelect.appendChild(optgroup);
+  }
+
+  const savedVoiceExists =
+    Boolean(settings.azureVoice) && AZURE_VOICES.some((v) => v.shortName === settings.azureVoice);
+  if (savedVoiceExists) {
+    voiceSelect.value = settings.azureVoice!;
+  } else {
+    applyAccentDefaultVoice(settings.accent);
+  }
+
+  voicesReady = true;
+}
+
+function applyAccentDefaultVoice(accent: Accent, browserVoices?: SpeechSynthesisVoice[]) {
+  if (settings.engine === 'azure') {
+    const best = pickDefaultAzureVoice(accent);
+    if (best) {
+      voiceSelect.value = best.shortName;
+      settings.azureVoice = best.shortName;
+      saveSettings({ azureVoice: best.shortName });
+    }
+    return;
+  }
+
+  const voices = browserVoices ?? speechSynthesis.getVoices();
   const best =
     accent === 'en'
       ? pickBestVoice(voices, 'en', ['en-gb', 'en-us'], true)
       : pickBestVoice(voices, 'it', ['it-it'], true);
   if (best) {
     voiceSelect.value = best.voiceURI;
+    settings.voiceURI = best.voiceURI;
     saveSettings({ voiceURI: best.voiceURI });
   }
 }
@@ -180,15 +241,32 @@ function setAccentButtons(accent: Accent) {
   accentEnBtn.setAttribute('aria-pressed', String(accent === 'en'));
 }
 
-speechSynthesis.addEventListener('voiceschanged', populateVoices);
-if (!populateVoices()) {
+function setEngineButtons(engine: Engine) {
+  engineBrowserBtn.classList.toggle('is-active', engine === 'browser');
+  engineAzureBtn.classList.toggle('is-active', engine === 'azure');
+  engineBrowserBtn.setAttribute('aria-pressed', String(engine === 'browser'));
+  engineAzureBtn.setAttribute('aria-pressed', String(engine === 'azure'));
+}
+
+function refreshVoiceOptions() {
+  if (settings.engine === 'azure') {
+    populateAzureVoiceSelect();
+    return;
+  }
+  voicesReady = false;
+  if (populateBrowserVoices()) return;
   // Chrome/Android e Safari possono popolare le voci con un piccolo ritardo dopo il caricamento
   let attempts = 0;
   const retry = setInterval(() => {
     attempts += 1;
-    if (populateVoices() || attempts > 20) clearInterval(retry);
+    if (populateBrowserVoices() || attempts > 20) clearInterval(retry);
   }, 200);
 }
+
+speechSynthesis.addEventListener('voiceschanged', () => {
+  if (settings.engine === 'browser') populateBrowserVoices();
+});
+refreshVoiceOptions();
 
 // --- eventi UI ---
 
@@ -206,7 +284,57 @@ accentEnBtn.addEventListener('click', () => {
   saveSettings({ accent: 'en' });
 });
 
+engineBrowserBtn.addEventListener('click', () => {
+  if (settings.engine === 'browser') return;
+  if (isSpeaking) {
+    stopCurrentEngine();
+    setSpeakingState(false);
+  }
+  settings.engine = 'browser';
+  saveSettings({ engine: 'browser' });
+  setEngineButtons('browser');
+  azurePanel.hidden = true;
+  refreshVoiceOptions();
+});
+
+engineAzureBtn.addEventListener('click', () => {
+  if (settings.engine === 'azure') return;
+  if (isSpeaking) {
+    stopCurrentEngine();
+    setSpeakingState(false);
+  }
+  settings.engine = 'azure';
+  saveSettings({ engine: 'azure' });
+  setEngineButtons('azure');
+  azurePanel.hidden = false;
+  refreshVoiceOptions();
+});
+
+azureRegionSelect.addEventListener('change', () => {
+  settings.azureRegion = azureRegionSelect.value;
+  saveSettings({ azureRegion: azureRegionSelect.value });
+});
+
+azureKeyInput.addEventListener('input', () => {
+  settings.azureKey = azureKeyInput.value;
+  saveSettings({ azureKey: azureKeyInput.value });
+});
+
 voiceSelect.addEventListener('change', () => {
+  if (settings.engine === 'azure') {
+    settings.azureVoice = voiceSelect.value;
+    saveSettings({ azureVoice: voiceSelect.value });
+    const selected = AZURE_VOICES.find((v) => v.shortName === voiceSelect.value);
+    if (selected) {
+      const matchedAccent: Accent = selected.lang.toLowerCase().startsWith('it') ? 'it' : 'en';
+      settings.accent = matchedAccent;
+      setAccentButtons(matchedAccent);
+      saveSettings({ accent: matchedAccent });
+    }
+    return;
+  }
+
+  settings.voiceURI = voiceSelect.value;
   saveSettings({ voiceURI: voiceSelect.value });
 
   const selectedVoice = speechSynthesis.getVoices().find((v) => v.voiceURI === voiceSelect.value);
@@ -290,6 +418,15 @@ function speak() {
     setStatus('Scrivi del testo prima di ascoltare.');
     return;
   }
+
+  if (settings.engine === 'azure') {
+    speakWithAzure(chunks);
+  } else {
+    speakWithBrowser(chunks);
+  }
+}
+
+function speakWithBrowser(chunks: string[]) {
   if (!voicesReady || !speechSynthesis.getVoices().length) {
     setStatus('Nessuna voce disponibile su questo dispositivo.');
     return;
@@ -331,17 +468,68 @@ function speak() {
   setSpeakingState(true);
 }
 
+function speakWithAzure(chunks: string[]) {
+  const key = azureKeyInput.value.trim();
+  const region = azureRegionSelect.value;
+  if (!key) {
+    setStatus('Inserisci la tua chiave API Azure per usare questa voce.');
+    return;
+  }
+
+  const voice = AZURE_VOICES.find((v) => v.shortName === voiceSelect.value) ?? pickDefaultAzureVoice(settings.accent);
+  if (!voice) {
+    setStatus('Nessuna voce Azure disponibile.');
+    return;
+  }
+
+  azureSession?.stop();
+  azureSession = new AzureSpeechSession();
+  setSpeakingState(true);
+
+  const total = chunks.length;
+  void azureSession.speak(
+    chunks,
+    { key, region, voice, rate: parseFloat(rateInput.value), pitch: parseFloat(pitchInput.value) },
+    {
+      onChunkStart: (index) => setStatus(total > 1 ? `Frase ${index + 1} di ${total}...` : 'In riproduzione...'),
+      onDone: () => {
+        setSpeakingState(false);
+        setStatus('Riproduzione completata.');
+      },
+      onError: (message) => {
+        setSpeakingState(false);
+        setStatus(`Errore Azure: ${message}`);
+      },
+    },
+  );
+}
+
+function pauseCurrentEngine() {
+  if (settings.engine === 'azure') azureSession?.pause();
+  else speechSynthesis.pause();
+}
+
+function resumeCurrentEngine() {
+  if (settings.engine === 'azure') azureSession?.resume();
+  else speechSynthesis.resume();
+}
+
+function stopCurrentEngine() {
+  if (settings.engine === 'azure') azureSession?.stop();
+  else speechSynthesis.cancel();
+}
+
 btnPlay.addEventListener('click', speak);
 
 btnPause.addEventListener('click', () => {
   if (!isSpeaking) return;
   if (!isPaused) {
-    speechSynthesis.pause();
+    pauseCurrentEngine();
     isPaused = true;
     btnPause.textContent = '▶ Riprendi';
     setStatus('In pausa.');
   } else {
-    speechSynthesis.resume();
+    resumeCurrentEngine();
     isPaused = false;
     btnPause.textContent = '⏸ Pausa';
     setStatus('In riproduzione...');
@@ -349,7 +537,7 @@ btnPause.addEventListener('click', () => {
 });
 
 btnStop.addEventListener('click', () => {
-  speechSynthesis.cancel();
+  stopCurrentEngine();
   setSpeakingState(false);
   setStatus('Pronto.');
 });
