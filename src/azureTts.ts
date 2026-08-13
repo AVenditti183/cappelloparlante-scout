@@ -89,11 +89,27 @@ function pitchToPercent(pitch: number): string {
   return `${percent >= 0 ? '+' : ''}${percent}%`;
 }
 
-function buildSsml(text: string, voice: AzureVoiceOption, rate: number, pitch: number, style: string): string {
+export interface BackgroundAudio {
+  url: string;
+  volume: number;
+}
+
+function buildSsml(
+  text: string,
+  voice: AzureVoiceOption,
+  rate: number,
+  pitch: number,
+  style: string,
+  background?: BackgroundAudio,
+): string {
   const prosody = `<prosody rate="${rate}" pitch="${pitchToPercent(pitch)}">${escapeSsml(text)}</prosody>`;
   const body = style && voice.styles.includes(style) ? `<mstts:express-as style="${style}">${prosody}</mstts:express-as>` : prosody;
+  const backgroundTag = background
+    ? `<mstts:backgroundaudio src="${escapeSsml(background.url)}" volume="${background.volume}" fadein="3000" fadeout="3000"/>`
+    : '';
   return (
     `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="${voice.lang}">` +
+    backgroundTag +
     `<voice name="${voice.shortName}">${body}</voice>` +
     `</speak>`
   );
@@ -113,7 +129,15 @@ export class AzureSpeechSession {
 
   async speak(
     chunks: string[],
-    config: { key: string; region: string; voice: AzureVoiceOption; rate: number; pitch: number; style: string },
+    config: {
+      key: string;
+      region: string;
+      voice: AzureVoiceOption;
+      rate: number;
+      pitch: number;
+      style: string;
+      background?: BackgroundAudio;
+    },
     callbacks: AzureSpeakCallbacks,
   ): Promise<void> {
     try {
@@ -138,7 +162,7 @@ export class AzureSpeechSession {
     for (let index = 0; index < chunks.length; index += 1) {
       if (this.cancelled) return;
       callbacks.onChunkStart(index, chunks.length);
-      const ssml = buildSsml(chunks[index], config.voice, config.rate, config.pitch, config.style);
+      const ssml = buildSsml(chunks[index], config.voice, config.rate, config.pitch, config.style, config.background);
       try {
         const audioData = await this.synthesizeChunk(ssml);
         if (this.cancelled) return;

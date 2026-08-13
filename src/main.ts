@@ -12,6 +12,9 @@ const azureRegionSelect = document.querySelector<HTMLSelectElement>('#azure-regi
 const azureKeyInput = document.querySelector<HTMLInputElement>('#azure-key')!;
 const styleField = document.querySelector<HTMLDivElement>('#style-field')!;
 const styleSelect = document.querySelector<HTMLSelectElement>('#style-select')!;
+const bgUrlInput = document.querySelector<HTMLInputElement>('#azure-bg-url')!;
+const bgVolumeInput = document.querySelector<HTMLInputElement>('#azure-bg-volume')!;
+const bgVolumeValue = document.querySelector<HTMLSpanElement>('#bg-volume-value')!;
 const rateInput = document.querySelector<HTMLInputElement>('#rate-input')!;
 const pitchInput = document.querySelector<HTMLInputElement>('#pitch-input')!;
 const rateValue = document.querySelector<HTMLSpanElement>('#rate-value')!;
@@ -30,6 +33,8 @@ interface Settings {
   azureRegion: string;
   azureKey: string;
   azureStyle: string;
+  azureBgUrl: string;
+  azureBgVolume: number;
   engine: Engine;
   rate: number;
   pitch: number;
@@ -45,6 +50,8 @@ const defaultSettings: Settings = {
   azureRegion: 'italynorth',
   azureKey: '',
   azureStyle: '',
+  azureBgUrl: '',
+  azureBgVolume: 0.5,
   engine: 'browser',
   rate: 0.95,
   pitch: 1,
@@ -80,6 +87,9 @@ rateValue.textContent = `${settings.rate.toFixed(2)}×`;
 pitchValue.textContent = settings.pitch.toFixed(1);
 azureRegionSelect.value = settings.azureRegion;
 azureKeyInput.value = settings.azureKey;
+bgUrlInput.value = settings.azureBgUrl;
+bgVolumeInput.value = String(settings.azureBgVolume);
+bgVolumeValue.textContent = settings.azureBgVolume.toFixed(2);
 setAccentButtons(settings.accent);
 setEngineButtons(settings.engine);
 azurePanel.hidden = settings.engine !== 'azure';
@@ -363,6 +373,18 @@ azureKeyInput.addEventListener('input', () => {
   saveSettings({ azureKey: azureKeyInput.value });
 });
 
+bgUrlInput.addEventListener('input', () => {
+  settings.azureBgUrl = bgUrlInput.value;
+  saveSettings({ azureBgUrl: bgUrlInput.value });
+});
+
+bgVolumeInput.addEventListener('input', () => {
+  const volume = parseFloat(bgVolumeInput.value);
+  bgVolumeValue.textContent = volume.toFixed(2);
+  settings.azureBgVolume = volume;
+  saveSettings({ azureBgVolume: volume });
+});
+
 voiceSelect.addEventListener('change', () => {
   if (settings.engine === 'azure') {
     settings.azureVoice = voiceSelect.value;
@@ -542,13 +564,19 @@ function speakWithAzure(chunks: string[]) {
     return;
   }
 
+  const bgUrl = bgUrlInput.value.trim();
+  // Con audio di sottofondo l'intero testo va in un'unica richiesta: il tag
+  // mstts:backgroundaudio riparte da capo a ogni <speak>, quindi spezzettare
+  // per frase farebbe ripartire la traccia a ogni frase.
+  const effectiveChunks = bgUrl ? [chunks.join(' ')] : chunks;
+
   azureSession?.stop();
   azureSession = new AzureSpeechSession();
   setSpeakingState(true);
 
-  const total = chunks.length;
+  const total = effectiveChunks.length;
   void azureSession.speak(
-    chunks,
+    effectiveChunks,
     {
       key,
       region,
@@ -556,6 +584,7 @@ function speakWithAzure(chunks: string[]) {
       rate: parseFloat(rateInput.value),
       pitch: parseFloat(pitchInput.value),
       style: styleSelect.value,
+      background: bgUrl ? { url: bgUrl, volume: parseFloat(bgVolumeInput.value) } : undefined,
     },
     {
       onChunkStart: (index) => setStatus(total > 1 ? `Frase ${index + 1} di ${total}...` : 'In riproduzione...'),
