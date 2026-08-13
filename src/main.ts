@@ -1,5 +1,12 @@
 import './style.css';
-import { AZURE_VOICES, AzureSpeechSession, isDragonHD, pickDefaultAzureVoice, styleLabel } from './azureTts';
+import {
+  AZURE_VOICES,
+  AzureSpeechSession,
+  isDragonHD,
+  PARALINGUISTIC_TAGS,
+  pickDefaultAzureVoice,
+  styleLabel,
+} from './azureTts';
 
 const textInput = document.querySelector<HTMLTextAreaElement>('#text-input')!;
 const voiceSelect = document.querySelector<HTMLSelectElement>('#voice-select')!;
@@ -301,11 +308,24 @@ function refreshStyleOptions() {
 
   styleField.hidden = false;
   styleSelect.innerHTML = '<option value="">Nessuna (neutra)</option>';
-  for (const style of voice.styles) {
-    const option = document.createElement('option');
-    option.value = style;
-    option.textContent = styleLabel(style);
-    styleSelect.appendChild(option);
+
+  const emotionalStyles = voice.styles.filter((s) => !PARALINGUISTIC_TAGS.includes(s));
+  const paralinguistics = voice.styles.filter((s) => PARALINGUISTIC_TAGS.includes(s));
+  const groups: Array<{ label: string; styles: string[] }> = [
+    { label: 'Stili', styles: emotionalStyles },
+    { label: 'Paralinguistica', styles: paralinguistics },
+  ];
+  for (const group of groups) {
+    if (!group.styles.length) continue;
+    const optgroup = document.createElement('optgroup');
+    optgroup.label = group.label;
+    for (const style of group.styles) {
+      const option = document.createElement('option');
+      option.value = style;
+      option.textContent = styleLabel(style);
+      optgroup.appendChild(option);
+    }
+    styleSelect.appendChild(optgroup);
   }
 
   const validStyle = voice.styles.includes(settings.azureStyle) ? settings.azureStyle : '';

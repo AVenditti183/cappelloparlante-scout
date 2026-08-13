@@ -32,7 +32,68 @@ const STYLE_LABELS: Record<string, string> = {
   throat_clearing: 'Schiarita di voce',
   breathing: 'Respiro',
   yawning: 'Sbadiglio',
+  // Stili emotivi aggiuntivi, disponibili solo sulle voci HD (DragonHD)
+  amazed: 'Stupito',
+  amused: 'Divertito',
+  annoyed: 'Infastidito',
+  anxious: 'Ansioso',
+  appreciative: 'Riconoscente',
+  calm: 'Calmo',
+  cautious: 'Cauto',
+  concerned: 'Preoccupato',
+  confident: 'Sicuro di sé',
+  confused: 'Confuso',
+  curious: 'Curioso',
+  defeated: 'Sconfitto',
+  defensive: 'Sulla defensiva',
+  defiant: 'Di sfida',
+  determined: 'Determinato',
+  disappointed: 'Deluso',
+  disgusted: 'Disgustato',
+  doubtful: 'Dubbioso',
+  ecstatic: 'Estasiato',
+  encouraging: 'Incoraggiante',
+  fast: 'Veloce',
+  fearful: 'Timoroso',
+  frustrated: 'Frustrato',
+  happy: 'Felice',
+  hesitant: 'Esitante',
+  hurt: 'Ferito',
+  impatient: 'Impaziente',
+  impressed: 'Impressionato',
+  intrigued: 'Incuriosito',
+  joking: 'Scherzoso',
+  laughing: 'Che ride',
+  optimistic: 'Ottimista',
+  painful: 'Dolorante',
+  panicked: 'Nel panico',
+  panting: 'Ansimante',
+  pleading: 'Implorante',
+  proud: 'Fiero',
+  quiet: 'Silenzioso',
+  reassuring: 'Rassicurante',
+  reflective: 'Pensieroso',
+  relieved: 'Sollevato',
+  remorseful: 'Pieno di rimorso',
+  resigned: 'Rassegnato',
+  sarcastic: 'Sarcastico',
+  secretive: 'Riservato',
+  serious: 'Serio',
+  shocked: 'Scioccato',
+  shy: 'Timido',
+  skeptical: 'Scettico',
+  slow: 'Lento',
+  struggling: 'In difficoltà',
+  surprised: 'Sorpreso',
+  suspicious: 'Sospettoso',
+  sympathetic: 'Comprensivo',
+  upset: 'Sconvolto',
+  urgent: 'Urgente',
 };
+
+// Tag paralinguistici (verso/rumore, non un'emozione): usati per raggruppare
+// il menu "Espressione" in due categorie quando una voce ne ha molti (HD).
+export const PARALINGUISTIC_TAGS = ['sighing', 'laughter', 'coughing', 'throat_clearing', 'breathing', 'yawning'];
 
 export function styleLabel(style: string): string {
   return STYLE_LABELS[style] ?? style;
@@ -45,6 +106,20 @@ export function styleLabel(style: string): string {
 // ma un set curato evita una chiamata di rete extra prima di poter parlare)
 const HD_REGIONS = ['eastus', 'westeurope', 'southeastasia'];
 
+// Stili + tag paralinguistici supportati dalle voci DragonHD (elenco ufficiale).
+const HD_STYLES = [
+  'amazed', 'amused', 'angry', 'annoyed', 'anxious', 'appreciative', 'calm', 'cautious',
+  'concerned', 'confident', 'confused', 'curious', 'defeated', 'defensive', 'defiant',
+  'determined', 'disappointed', 'disgusted', 'doubtful', 'ecstatic', 'encouraging', 'excited',
+  'fast', 'fearful', 'frustrated', 'happy', 'hesitant', 'hurt', 'impatient', 'impressed',
+  'intrigued', 'joking', 'laughing', 'optimistic', 'painful', 'panicked', 'panting', 'pleading',
+  'proud', 'quiet', 'reassuring', 'reflective', 'relieved', 'remorseful', 'resigned', 'sad',
+  'sarcastic', 'secretive', 'serious', 'shocked', 'shouting', 'shy', 'skeptical', 'slow',
+  'struggling', 'surprised', 'suspicious', 'sympathetic', 'terrified', 'upset', 'urgent',
+  'whispering',
+  ...PARALINGUISTIC_TAGS,
+];
+
 export const AZURE_VOICES: AzureVoiceOption[] = [
   // Voci "HD" (DragonHD): la generazione piu' realistica, basata su LLM, che
   // adatta automaticamente tono ed emozione al contesto. In preview, disponibili
@@ -54,7 +129,7 @@ export const AZURE_VOICES: AzureVoiceOption[] = [
     label: 'Alessio (HD)',
     lang: 'it-IT',
     gender: 'M',
-    styles: ['sighing', 'laughter', 'coughing', 'throat_clearing', 'breathing', 'yawning'],
+    styles: HD_STYLES,
     restrictedRegions: HD_REGIONS,
   },
   {
@@ -62,7 +137,7 @@ export const AZURE_VOICES: AzureVoiceOption[] = [
     label: 'Isabella (HD)',
     lang: 'it-IT',
     gender: 'F',
-    styles: ['sighing', 'laughter', 'coughing', 'throat_clearing', 'breathing', 'yawning'],
+    styles: HD_STYLES,
     restrictedRegions: HD_REGIONS,
   },
   {
@@ -70,7 +145,7 @@ export const AZURE_VOICES: AzureVoiceOption[] = [
     label: 'Andrew (HD)',
     lang: 'en-US',
     gender: 'M',
-    styles: ['sighing', 'laughter', 'coughing', 'throat_clearing', 'breathing', 'yawning'],
+    styles: HD_STYLES,
     restrictedRegions: HD_REGIONS,
   },
   {
@@ -78,7 +153,7 @@ export const AZURE_VOICES: AzureVoiceOption[] = [
     label: 'Ava (HD)',
     lang: 'en-US',
     gender: 'F',
-    styles: ['sighing', 'laughter', 'coughing', 'throat_clearing', 'breathing', 'yawning'],
+    styles: HD_STYLES,
     restrictedRegions: HD_REGIONS,
   },
   // Voci "Multilingual", generazione piu' recente: nessuno stile SSML ma
