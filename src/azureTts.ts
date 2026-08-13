@@ -334,15 +334,36 @@ export class AzureSpeechSession {
       return;
     }
 
+    // Sintetizza ogni frase mentre la precedente e' ancora in riproduzione,
+    // invece di aspettare che finisca di parlare prima di interrogare Azure
+    // per la frase dopo: elimina il vuoto tra una frase e l'altra.
+    const synthesizeIndex = (index: number) =>
+      this.synthesizeChunk(buildSsml(chunks[index], config.voice, config.rate, config.pitch, config.style, config.background))
+        .then((audioData) => ({ ok: true as const, audioData }))
+        .catch((error: unknown) => ({ ok: false as const, error }));
+
+    let pending = chunks.length ? synthesizeIndex(0) : null;
+
     for (let index = 0; index < chunks.length; index += 1) {
       if (this.cancelled) return;
       callbacks.onChunkStart(index, chunks.length);
-      const ssml = buildSsml(chunks[index], config.voice, config.rate, config.pitch, config.style, config.background);
+
+      const result = await pending!;
+      const nextIndex = index + 1;
+      pending = nextIndex < chunks.length ? synthesizeIndex(nextIndex) : null;
+
+      if (!result.ok) {
+        if (!this.cancelled) {
+          callbacks.onError(result.error instanceof Error ? result.error.message : 'Errore di sintesi Azure.');
+        }
+        this.close();
+        return;
+      }
+      if (this.cancelled) return;
+      callbacks.onAudioChunk?.(result.audioData);
+
       try {
-        const audioData = await this.synthesizeChunk(ssml);
-        if (this.cancelled) return;
-        callbacks.onAudioChunk?.(audioData);
-        await this.playAudioData(audioData);
+        await this.playAudioData(result.audioData);
       } catch (error) {
         if (!this.cancelled) {
           callbacks.onError(error instanceof Error ? error.message : 'Errore di sintesi Azure.');
