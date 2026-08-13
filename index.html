@@ -59,8 +59,6 @@
             <label for="azure-bg-select">Audio di sottofondo (opzionale)</label>
             <select id="azure-bg-select">
               <option value="">Nessuno</option>
-              <option value="Audio1.mp3">Audio1</option>
-              <option value="Audio2.mp3">Audio2</option>
               <option value="custom">URL personalizzato...</option>
             </select>
           </div>
@@ -73,9 +71,13 @@
             <input type="range" id="azure-bg-volume" min="0" max="1" step="0.05" value="0.5" />
           </div>
           <div class="field">
-            <label for="azure-bg-fadein">Dissolvenza iniziale <span id="bg-fadein-value" class="value-pill">1.0s</span></label>
-            <input type="range" id="azure-bg-fadein" min="0" max="5" step="0.5" value="1" />
+            <label for="azure-bg-fadein">Dissolvenza iniziale <span id="bg-fadein-value" class="value-pill">+1.0s</span></label>
+            <input type="range" id="azure-bg-fadein" min="-5" max="5" step="0.5" value="1" />
           </div>
+          <p class="azure-hint">
+            Valore negativo: il sottofondo parte per quei secondi da solo, con la voce che entra dopo (invece di
+            una semplice dissolvenza in volume).
+          </p>
           <div class="field">
             <label for="azure-bg-fadeout">Dissolvenza finale <span id="bg-fadeout-value" class="value-pill">1.0s</span></label>
             <input type="range" id="azure-bg-fadeout" min="0" max="5" step="0.5" value="1" />

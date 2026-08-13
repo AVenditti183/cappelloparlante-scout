@@ -94,6 +94,8 @@ export interface BackgroundAudio {
   volume: number;
   fadeInMs: number;
   fadeOutMs: number;
+  /** Silenzio prima che la voce inizi a parlare: il sottofondo suona da solo per questo tempo. */
+  leadInMs: number;
 }
 
 function buildSsml(
@@ -105,7 +107,9 @@ function buildSsml(
   background?: BackgroundAudio,
 ): string {
   const prosody = `<prosody rate="${rate}" pitch="${pitchToPercent(pitch)}">${escapeSsml(text)}</prosody>`;
-  const body = style && voice.styles.includes(style) ? `<mstts:express-as style="${style}">${prosody}</mstts:express-as>` : prosody;
+  const expressive = style && voice.styles.includes(style) ? `<mstts:express-as style="${style}">${prosody}</mstts:express-as>` : prosody;
+  const leadIn = background && background.leadInMs > 0 ? `<break time="${background.leadInMs}ms"/>` : '';
+  const body = leadIn + expressive;
   const backgroundTag = background
     ? `<mstts:backgroundaudio src="${escapeSsml(background.url)}" volume="${background.volume}" fadein="${background.fadeInMs}" fadeout="${background.fadeOutMs}"/>`
     : '';

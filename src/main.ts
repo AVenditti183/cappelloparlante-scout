@@ -86,6 +86,10 @@ function saveSettings(partial: Partial<Settings>) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
 }
 
+function formatSignedSeconds(seconds: number): string {
+  return `${seconds >= 0 ? '+' : ''}${seconds.toFixed(1)}s`;
+}
+
 const settings = loadSettings();
 let isSpeaking = false;
 let isPaused = false;
@@ -105,7 +109,7 @@ bgUrlInput.value = settings.azureBgUrl;
 bgVolumeInput.value = String(settings.azureBgVolume);
 bgVolumeValue.textContent = settings.azureBgVolume.toFixed(2);
 bgFadeInInput.value = String(settings.azureBgFadeIn);
-bgFadeInValue.textContent = `${settings.azureBgFadeIn.toFixed(1)}s`;
+bgFadeInValue.textContent = formatSignedSeconds(settings.azureBgFadeIn);
 bgFadeOutInput.value = String(settings.azureBgFadeOut);
 bgFadeOutValue.textContent = `${settings.azureBgFadeOut.toFixed(1)}s`;
 setAccentButtons(settings.accent);
@@ -339,6 +343,41 @@ speechSynthesis.addEventListener('voiceschanged', () => {
 });
 refreshVoiceOptions();
 
+// --- audio di sottofondo: elenco letto dal contenuto reale di public/audio/ su GitHub ---
+
+const GITHUB_AUDIO_FOLDER_API =
+  'https://api.github.com/repos/AVenditti183/cappelloparlante-scout/contents/public/audio';
+
+let backgroundAudioOptionsLoaded = false;
+
+async function populateBackgroundAudioOptions() {
+  if (backgroundAudioOptionsLoaded) return;
+  backgroundAudioOptionsLoaded = true;
+
+  try {
+    const response = await fetch(GITHUB_AUDIO_FOLDER_API);
+    if (!response.ok) throw new Error(`GitHub API: ${response.status}`);
+    const files: Array<{ name: string; download_url: string }> = await response.json();
+    const audioFiles = files.filter((f) => /\.(mp3|wav)$/i.test(f.name));
+
+    const customOption = bgSelect.querySelector('option[value="custom"]');
+    for (const file of audioFiles) {
+      const option = document.createElement('option');
+      option.value = file.download_url;
+      option.textContent = file.name.replace(/\.(mp3|wav)$/i, '');
+      bgSelect.insertBefore(option, customOption);
+    }
+  } catch (error) {
+    console.warn('Impossibile leggere la cartella audio da GitHub:', error);
+  }
+
+  const hasSavedOption = Array.from(bgSelect.options).some((o) => o.value === settings.azureBgSelection);
+  bgSelect.value = hasSavedOption ? settings.azureBgSelection : '';
+  bgUrlField.hidden = bgSelect.value !== 'custom';
+}
+
+if (settings.engine === 'azure') void populateBackgroundAudioOptions();
+
 // --- eventi UI ---
 
 accentItBtn.addEventListener('click', () => {
@@ -379,6 +418,7 @@ engineAzureBtn.addEventListener('click', () => {
   setEngineButtons('azure');
   azurePanel.hidden = false;
   refreshVoiceOptions();
+  void populateBackgroundAudioOptions();
 });
 
 azureRegionSelect.addEventListener('change', () => {
@@ -411,7 +451,7 @@ bgVolumeInput.addEventListener('input', () => {
 
 bgFadeInInput.addEventListener('input', () => {
   const seconds = parseFloat(bgFadeInInput.value);
-  bgFadeInValue.textContent = `${seconds.toFixed(1)}s`;
+  bgFadeInValue.textContent = formatSignedSeconds(seconds);
   settings.azureBgFadeIn = seconds;
   saveSettings({ azureBgFadeIn: seconds });
 });
@@ -590,8 +630,20 @@ function speakWithBrowser(chunks: string[]) {
 
 function resolveBackgroundAudioUrl(): string {
   if (bgSelect.value === 'custom') return bgUrlInput.value.trim();
-  if (!bgSelect.value) return '';
-  return new URL(`${import.meta.env.BASE_URL}audio/${bgSelect.value}`, window.location.origin).href;
+  return bgSelect.value; // '' (nessuno) oppure il download_url già completo restituito da GitHub
+}
+
+function buildBackgroundAudioConfig(url: string) {
+  const fadeInSeconds = parseFloat(bgFadeInInput.value);
+  return {
+    url,
+    volume: parseFloat(bgVolumeInput.value),
+    // Azure richiede una durata non negativa: il segno dello slider indica solo
+    // se usarla come dissolvenza (positivo) o come attesa prima della voce (negativo).
+    fadeInMs: Math.round(Math.abs(fadeInSeconds) * 1000),
+    fadeOutMs: Math.round(parseFloat(bgFadeOutInput.value) * 1000),
+    leadInMs: fadeInSeconds < 0 ? Math.round(Math.abs(fadeInSeconds) * 1000) : 0,
+  };
 }
 
 function speakWithAzure(chunks: string[]) {
@@ -628,14 +680,7 @@ function speakWithAzure(chunks: string[]) {
       rate: parseFloat(rateInput.value),
       pitch: parseFloat(pitchInput.value),
       style: styleSelect.value,
-      background: bgUrl
-        ? {
-            url: bgUrl,
-            volume: parseFloat(bgVolumeInput.value),
-            fadeInMs: Math.round(parseFloat(bgFadeInInput.value) * 1000),
-            fadeOutMs: Math.round(parseFloat(bgFadeOutInput.value) * 1000),
-          }
-        : undefined,
+      background: bgUrl ? buildBackgroundAudioConfig(bgUrl) : undefined,
     },
     {
       onChunkStart: (index) => setStatus(total > 1 ? `Frase ${index + 1} di ${total}...` : 'In riproduzione...'),
